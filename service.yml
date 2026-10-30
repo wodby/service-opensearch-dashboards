@@ -1,0 +1,123 @@
+name: opensearch-dashboards
+title: OpenSearch Dashboards
+guidance: GUIDANCE.md
+icon: opensearch
+type: service
+scalable: false
+
+labels:
+- opensearch
+- visualization
+- observability
+
+options:
+# The major and minor version must match the linked OpenSearch service.
+- version: '3.8'
+  tag: '3.8.0'
+  default: true
+
+endpoints:
+- name: opensearch-dashboards
+  ports:
+  - name: http
+    number: 5601
+    protocol: http
+    main: true
+
+tokens:
+- name: cookie_password
+  generate:
+    regex: '[A-Za-z0-9]{64}'
+
+links:
+- name: opensearch
+  title: OpenSearch
+  required: true
+  env:
+  - name: OPENSEARCH_HOSTS
+    value: '["https://{{link.host}}:{{link.port}}"]'
+  - name: OPENSEARCH_USERNAME
+    value: kibanaserver
+  - name: OPENSEARCH_PASSWORD
+    value: '{{link.tokens.dashboards_password}}'
+    secret: true
+  selectors:
+  - type: search
+    labels:
+    - opensearch
+
+configs:
+- name: dashboards
+  title: OpenSearch Dashboards config
+  config: opensearch_dashboards.yml
+  filepath: /usr/share/opensearch-dashboards/config/opensearch_dashboards.yml
+  processTokens: true
+
+helm:
+  name: wodby
+  source: oci://registry-1.docker.io/wodby/stateless
+  chart: oci://registry-1.docker.io/wodby/stateless
+  version: 0.4.0
+  valueMappings:
+    replicas: replicaCount
+    nameOverride: nameOverride
+    fullnameOverride: fullnameOverride
+    serviceAccountName: serviceAccount.name
+    serviceAccountCreate: serviceAccount.create
+    strategy: strategy.type
+    minReady: minReadySeconds
+    progressDeadline: progressDeadlineSeconds
+    shutdownGracePeriod: terminationGracePeriodSeconds
+  values:
+  - name: containerName
+    value: opensearch-dashboards
+  - name: containerPorts
+    value:
+    - name: http
+      containerPort: 5601
+      protocol: TCP
+  - name: securityContext
+    value:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1000
+  # /api/status needs a signed-in user; the login page answers once the server can reach OpenSearch.
+  - name: startupProbe
+    value:
+      httpGet:
+        path: /app/login
+        port: http
+      failureThreshold: 60
+      periodSeconds: 10
+  - name: readinessProbe
+    value:
+      httpGet:
+        path: /app/login
+        port: http
+      periodSeconds: 10
+      timeoutSeconds: 5
+  - name: livenessProbe
+    value:
+      tcpSocket:
+        port: http
+      initialDelaySeconds: 30
+      periodSeconds: 20
+
+workloads:
+- name: main
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: '{{helm.release}}'
+  kind: deployment
+  primary: true
+  helm:
+    labels: podLabels
+    annotations: podAnnotations
+    volumes: extraVolumes
+  containers:
+  - name: opensearch-dashboards
+    image: opensearchproject/opensearch-dashboards
+    helm:
+      resources: resources
+      env: envVars
+      mounts: extraVolumeMounts
