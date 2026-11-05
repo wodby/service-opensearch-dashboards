@@ -117,6 +117,10 @@ workloads:
   containers:
   - name: opensearch-dashboards
     image: opensearchproject/opensearch-dashboards
+    resources:
+      request:
+        cpu: 90
+        memory: 224
     helm:
       resources: resources
       env: envVars
