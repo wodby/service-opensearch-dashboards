@@ -14,6 +14,7 @@ options:
 # The major and minor version must match the linked OpenSearch service.
 - version: '3.8'
   tag: '3.8.0'
+  digest: sha256:7fb7ec1b33f1ef49796dc31180f17f227361263c15bb19c56a8a6e5a38852bbd
   default: true
 
 endpoints:
